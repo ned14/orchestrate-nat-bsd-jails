@@ -22,16 +22,25 @@ rm -rf /usr/jails/flavours/make_natted_jails
 cp -a /usr/jails/flavours/example /usr/jails/flavours/make_natted_jails
 rm -rf /usr/jails/flavours/make_natted_jails/etc/rc.d/ezjail.flavour.example
 cp /etc/resolv.conf /usr/jails/flavours/make_natted_jails/etc/resolv.conf
+
+# Turn on IP forwarding
+sysctl net.inet.ip.forwarding=1
   
 for N in $(seq 1 $TOTALJAILS)
 do
   echo "Creating jail $N of $TOTALJAILS ..."
   JAILNAME=$(printf "lo7%03s" "$N")
+  rm -rf /usr/jails/$JAILNAME
   ifconfig $JAILNAME create
   ifconfig $JAILNAME inet 10.77.$N.1 netmask 255.255.255.0
   ezjail-admin create -f make_natted_jails $JAILNAME $JAILNAME\|10.77.$N.1 2> /dev/null
+  # Enable raw sockets
+  echo "export jail_${JAILNAME}_parameters=\"allow.raw_sockets\"" >> /usr/local/etc/ezjail/$JAILNAME
   
   # Copy files into /usr/jails/jail77N/root
+  cp -a runonboot /usr/jails/$JAILNAME/etc/rc.d/runonboot
+  
+  # Start the jail
   ezjail-admin start $JAILNAME
 done
 
@@ -44,6 +53,8 @@ do
   JAILNAME=$(printf "lo7%03s" "$N")
   ezjail-admin stop $JAILNAME
   ezjail-admin delete $JAILNAME
+  echo "Ping log was:"
+  cat /usr/jails/$JAILNAME/root/pinglog
   rm -rf /usr/jails/$JAILNAME
   ifconfig $JAILNAME destroy
 done

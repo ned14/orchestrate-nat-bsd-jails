@@ -1,0 +1,18 @@
+#!/bin/sh
+#
+# BEFORE: DAEMON
+# PROVIDE: runonboot
+
+. /etc/rc.subr
+
+name=runoboot
+start_cmd=runonboot_setup
+
+runonboot_setup() {
+
+echo Hi > /root/pinglog
+/sbin/ping 192.168.1.254 &>> /root/pinglog
+
+}
+
+run_rc_command "$1"
