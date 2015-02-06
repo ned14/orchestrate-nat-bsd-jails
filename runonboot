@@ -10,8 +10,7 @@ start_cmd=runonboot_setup
 
 runonboot_setup() {
 
-echo Hi > /root/pinglog
-/sbin/ping 192.168.1.254 &>> /root/pinglog
+/usr/bin/stdbuf -i0 -o0 -e0 /sbin/ping 192.168.1.254 > /root/pinglog &
 
 }
 

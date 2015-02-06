@@ -25,17 +25,25 @@ cp /etc/resolv.conf /usr/jails/flavours/make_natted_jails/etc/resolv.conf
 
 # Turn on IP forwarding
 sysctl net.inet.ip.forwarding=1
-  
+
+# What is the IP of em0?
+HOSTIPADDR=$(ifconfig em0 | grep "inet " | cut -f 2 -d ' ' -)
+
 for N in $(seq 1 $TOTALJAILS)
 do
   echo "Creating jail $N of $TOTALJAILS ..."
   JAILNAME=$(printf "lo7%03s" "$N")
   rm -rf /usr/jails/$JAILNAME
   ifconfig $JAILNAME create
+  # Create a custom loopback device for the jail
   ifconfig $JAILNAME inet 10.77.$N.1 netmask 255.255.255.0
+  # Create the jail from my flavour
   ezjail-admin create -f make_natted_jails $JAILNAME $JAILNAME\|10.77.$N.1 2> /dev/null
-  # Enable raw sockets
+  # Enable raw sockets for the jail
   echo "export jail_${JAILNAME}_parameters=\"allow.raw_sockets\"" >> /usr/local/etc/ezjail/$JAILNAME
+  # Configure a nat on custom loopback device
+  echo "nat pass on em0 from 10.77.$N.1 to any -> $HOSTIPADDR" > pf.conf
+  pfctl -f pf.conf
   
   # Copy files into /usr/jails/jail77N/root
   cp -a runonboot /usr/jails/$JAILNAME/etc/rc.d/runonboot
@@ -51,10 +59,13 @@ for N in $(seq 1 $TOTALJAILS)
 do  
   echo "Deleting jail $N of $TOTALJAILS ..."
   JAILNAME=$(printf "lo7%03s" "$N")
+  echo "Ping log was:"
+  jexec $JAILNAME /usr/bin/killall ping
+  jexec $JAILNAME /bin/cat /root/pinglog
   ezjail-admin stop $JAILNAME
   ezjail-admin delete $JAILNAME
-  echo "Ping log was:"
-  cat /usr/jails/$JAILNAME/root/pinglog
   rm -rf /usr/jails/$JAILNAME
   ifconfig $JAILNAME destroy
 done
+# Flush the NAT table entries
+pfctl -F nat
