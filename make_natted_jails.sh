@@ -22,6 +22,7 @@ rm -rf /usr/jails/flavours/make_natted_jails
 cp -a /usr/jails/flavours/example /usr/jails/flavours/make_natted_jails
 rm -rf /usr/jails/flavours/make_natted_jails/etc/rc.d/ezjail.flavour.example
 cp /etc/resolv.conf /usr/jails/flavours/make_natted_jails/etc/resolv.conf
+echo 'sshd_enable="YES"' >> /usr/jails/flavours/make_natted_jails/etc/rc.conf
 
 # Turn on IP forwarding
 sysctl net.inet.ip.forwarding=1
@@ -29,21 +30,28 @@ sysctl net.inet.ip.forwarding=1
 # What is the IP of em0?
 HOSTIPADDR=$(ifconfig em0 | grep "inet " | cut -f 2 -d ' ' -)
 
+echo 'include "/etc/pf.conf"' > pf.conf
+for N in $(seq 1 $TOTALJAILS)
+do
+  echo "Configuring simulated network stack $N of $TOTALJAILS ..."
+  JAILNAME=$(printf "lo7%03s" "$N")
+  rm -rf /usr/jails/$JAILNAME
+  # Create a custom loopback device for the jail
+  ifconfig $JAILNAME create
+  ifconfig $JAILNAME inet 10.77.$N.1 netmask 255.255.255.0
+  # Configure a nat on custom loopback device
+  echo "nat pass on em0 from 10.77.$N.1 to any -> $HOSTIPADDR" >> pf.conf
+done
+pfctl -f pf.conf
+
 for N in $(seq 1 $TOTALJAILS)
 do
   echo "Creating jail $N of $TOTALJAILS ..."
   JAILNAME=$(printf "lo7%03s" "$N")
-  rm -rf /usr/jails/$JAILNAME
-  ifconfig $JAILNAME create
-  # Create a custom loopback device for the jail
-  ifconfig $JAILNAME inet 10.77.$N.1 netmask 255.255.255.0
   # Create the jail from my flavour
   ezjail-admin create -f make_natted_jails $JAILNAME $JAILNAME\|10.77.$N.1 2> /dev/null
   # Enable raw sockets for the jail
   echo "export jail_${JAILNAME}_parameters=\"allow.raw_sockets\"" >> /usr/local/etc/ezjail/$JAILNAME
-  # Configure a nat on custom loopback device
-  echo "nat pass on em0 from 10.77.$N.1 to any -> $HOSTIPADDR" > pf.conf
-  pfctl -f pf.conf
   
   # Copy files into /usr/jails/jail77N/root
   cp -a runonboot /usr/jails/$JAILNAME/etc/rc.d/runonboot
