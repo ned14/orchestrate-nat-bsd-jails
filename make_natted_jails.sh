@@ -4,7 +4,7 @@
 # Created: Feb 2015
 
 if [ "$(id -u)" != "0" ]; then
-  >&2 echo "Need to run this script as root"
+  >&2 echo "ERROR: Need to run this script as root"
   exit 1
 fi
 if [ $# -eq 0 ]; then
@@ -13,7 +13,12 @@ if [ $# -eq 0 ]; then
 fi
 TOTALJAILS=$1
 if [ ! -e "/usr/jails/basejail" ]; then
-  >&2 echo "I see no base jail install. Have you run 'ezjail-admin install' yet?"
+  >&2 echo "ERROR: I see no base jail install. Have you run 'ezjail-admin install' yet?"
+  exit 1
+fi
+VIMAGE_IN_KERNEL=$(strings /boot/kernel/kernel | grep VIMAGE)
+if [ -z "$VIMAGE_IN_KERNEL" ]; then
+  >&2 echo "ERROR: This kernel appears to not have been built with networking stack virtualisation (VIMAGE)"
   exit 1
 fi
 
