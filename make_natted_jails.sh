@@ -16,10 +16,14 @@ if [ ! -e "/usr/jails/basejail" ]; then
   >&2 echo "ERROR: I see no base jail install. Have you run 'ezjail-admin install' yet?"
   exit 1
 fi
-#VIMAGE_IN_KERNEL=$(strings /boot/kernel/kernel | grep VIMAGE)
 VIMAGE_IN_KERNEL=$(dmesg | grep VIMAGE)
 if [ -z "$VIMAGE_IN_KERNEL" ]; then
   >&2 echo "ERROR: This kernel appears to not have been built with networking stack virtualisation (VIMAGE)"
+  exit 1
+fi
+FIREWALL_NAT_IN_KERNEL=$(strings /boot/kernel/kernel | grep IPFIREWALL_NAT)
+if [ -z "$FIREWALL_NAT_IN_KERNEL" ]; then
+  >&2 echo "ERROR: This kernel appears to not have been built with NAT enabled in the in-kernel firewall (IPFIREWALL_NAT)"
   exit 1
 fi
 
@@ -86,12 +90,14 @@ do
 ##  echo "network_interfaces=\"${NATJAILEPAIRNAME}b\"" >> /usr/jails/$JAILNAME/etc/rc.conf
 ##  echo "ifconfig_${NATJAILEPAIRNAME}b=\"DHCP\"" >> /usr/jails/$JAILNAME/etc/rc.conf
   echo "firewall_enable=\"YES\"" >> /usr/jails/$JAILNAME/etc/rc.conf
-#  echo "firewall_script=\"/etc/rc.firewall\"" >> /usr/jails/$JAILNAME/etc/rc.conf
-  echo "firewall_type=\"open\"" >> /usr/jails/$JAILNAME/etc/rc.conf
+  echo "firewall_script=\"/etc/rc.firewall\"" >> /usr/jails/$JAILNAME/etc/rc.conf
+  echo "firewall_type=\"OPEN\"" >> /usr/jails/$JAILNAME/etc/rc.conf
   echo "gateway_enable=\"YES\"" >> /usr/jails/$JAILNAME/etc/rc.conf
 #  echo "firewall_nat_enable=\"YES\"" >> /usr/jails/$JAILNAME/etc/rc.conf
 #  echo "firewall_nat_interface=\"${NATJAILEPAIRNAME}b\"" >> /usr/jails/$JAILNAME/etc/rc.conf
 #  echo "firewall_nat_flags=\"same_ports reset\"" >> /usr/jails/$JAILNAME/etc/rc.conf
+  echo "natd_enable=\"YES\"" >> /usr/jails/$JAILNAME/etc/rc.conf
+  echo "natd_interface=\"${NATJAILEPAIRNAME}b\"" >> /usr/jails/$JAILNAME/etc/rc.conf
   ifconfig bridge77 addm ${NATJAILEPAIRNAME}a up
   
   # Start the jail
@@ -104,8 +110,8 @@ do
   ifconfig ${JAILEPAIRNAME}a vnet $JAILNAME
   jexec $JAILNAME /sbin/ifconfig ${JAILEPAIRNAME}a inet 10.77.$N.254 netmask 255.255.255.0 up
   
-  # Create a NAT on this jail's outbound interface
-  #jexec $JAILNAME /sbin/ipfw nat 1 config if ${NATJAILEPAIRNAME}b unreg_only reset
+  # Start natd
+  jexec $JAILNAME /usr/sbin/service natd start
 
   # Check the NAT jail routing table
   jexec $JAILNAME /usr/bin/netstat -r
