@@ -1,0 +1,12 @@
+include GENERIC
+
+ident		NED
+options         VIMAGE
+options         IPFIREWALL
+options         IPFIREWALL_NAT
+options         IPDIVERT
+options         LIBALIAS
+device          epair
+device          if_bridge
+
+

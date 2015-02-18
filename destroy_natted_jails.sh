@@ -1,4 +1,4 @@
-#!/bin/sh -x
+#!/bin/sh
 # Destroy X NAT routed BSD jails
 # (C) 2015 MaidSafe - Niall Douglas
 # Created: Feb 2015

@@ -1,4 +1,4 @@
-#!/bin/sh -x
+#!/bin/sh
 # Create X NAT routed BSD jails
 # (C) 2015 MaidSafe - Niall Douglas
 # Created: Feb 2015
@@ -76,13 +76,22 @@ do
   echo "firewall_script=\"/etc/rc.firewall\"" >> /usr/jails/$JAILNAME/etc/rc.conf
   echo "firewall_type=\"OPEN\"" >> /usr/jails/$JAILNAME/etc/rc.conf
   echo "gateway_enable=\"YES\"" >> /usr/jails/$JAILNAME/etc/rc.conf
-  
-  if [ -n "$DIRTOCOPY" ]; then
-    cp -r "$DIRTOCOPY" /tmp/
-  fi
-  
+
   # Start the jail
   ezjail-admin start $JAILNAME
+  
+  # Create a local user in the jail
+  echo "jailuser::::::::/bin/sh:"  > /usr/jails/$JAILNAME/tmp/jailusers.conf
+  jexec $JAILNAME /usr/sbin/adduser -f /tmp/jailusers.conf -w no
+  
+  echo "#!/bin/sh" > /usr/jails/$JAILNAME/usr/home/jailuser/script.sh
+  chmod +x /usr/jails/$JAILNAME/usr/home/jailuser/script.sh
+  if [ -n "$DIRTOCOPY" ]; then
+    DIRLEAF=$(basename "$DIRTOCOPY")
+    cp -r "$DIRTOCOPY" /usr/jails/$JAILNAME/usr/home/jailuser/
+    echo "cd \"$DIRLEAF\"" >> /usr/jails/$JAILNAME/usr/home/jailuser/script.sh
+  fi
+  echo "$CMDTORUN > /tmp/cmdlog 2>&1 &" >> /usr/jails/$JAILNAME/usr/home/jailuser/script.sh
   
   if [ "$NATORBRIDGE" -eq 0 ]; then
   
@@ -140,13 +149,8 @@ do
   jexec $JAILNAME /usr/bin/netstat -r
   
   JAILNAME=$(printf "jail%03s" "$N")
-  DIRLEAF=$(basename "$DIRTOCOPY")
-  if [ -n "$SUDO_USER" ]; then
-    jexec -u $SUDO_USER $JAILNAME "cd /tmp/${DIRLEAF} && $CMDTORUN >& /tmp/cmdlog"
-  else
-    jexec $JAILNAME "cd /tmp/${DIRLEAF} && $CMDTORUN >& /tmp/cmdlog"
-  fi
+  jexec -U jailuser $JAILNAME /usr/home/jailuser/script.sh
 done
 
-echo "$TOTALJAILS NATed jails are now running command $CMDTORUN under user $SUDO_USER:"
+echo "$TOTALJAILS NATed jails are now running command $CMDTORUN under local user jailuser:"
 jls
